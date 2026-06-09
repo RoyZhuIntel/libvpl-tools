@@ -232,8 +232,7 @@ mfxStatus VPLSession::Open(std::list<SurfaceCaps> *surfaceCapsList) {
 
     mfxStatus sts = MFX_ERR_NONE;
 
-    // variables used only in 2.x version
-    mfxConfig cfg[4];
+    mfxConfig cfg[5];
 
     mfxVariant cfgVal      = {};
     cfgVal.Version.Version = MFX_VARIANT_VERSION;
@@ -251,59 +250,36 @@ mfxStatus VPLSession::Open(std::list<SurfaceCaps> *surfaceCapsList) {
     sts = MFXSetConfigFilterProperty(cfg[0], (mfxU8 *)"mfxImplDescription.Impl", cfgVal);
     VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for Impl");
 
-    // Implementation must provide an HEVC decoder
     cfg[1] = MFXCreateConfig(m_loader);
     VERIFY2(NULL != cfg[1], "MFXCreateConfig failed");
-    cfgVal.Type     = MFX_VARIANT_TYPE_U32;
-    cfgVal.Data.U32 = MFX_CODEC_HEVC;
-    sts             = MFXSetConfigFilterProperty(cfg[1], (mfxU8 *)"mfxImplDescription.mfxDecoderDescription.decoder.CodecID", cfgVal);
-    VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for decoder CodecID");
+    cfgVal.Type     = MFX_VARIANT_TYPE_PTR;
+    cfgVal.Data.Ptr = (mfxHDL)"mfx-gen";
+    sts             = MFXSetConfigFilterProperty(cfg[1], (mfxU8 *)"mfxImplDescription.ImplName", cfgVal);
+    VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for ImplName");
 
-    // Implementation used must have VPP scaling capability
     cfg[2] = MFXCreateConfig(m_loader);
     VERIFY2(NULL != cfg[2], "MFXCreateConfig failed");
     cfgVal.Type     = MFX_VARIANT_TYPE_U32;
-    cfgVal.Data.U32 = MFX_EXTBUFF_VPP_SCALING;
-    sts             = MFXSetConfigFilterProperty(cfg[2], (mfxU8 *)"mfxImplDescription.mfxVPPDescription.filter.FilterFourCC", cfgVal);
-    VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for VPP scale");
+    cfgVal.Data.U32 = 0x8086;
+    sts             = MFXSetConfigFilterProperty(cfg[2], (mfxU8 *)"mfxImplDescription.VendorID", cfgVal);
+    VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for VendorID");
 
-    // Implementation used must provide API version 2.9 or newer
     cfg[3] = MFXCreateConfig(m_loader);
     VERIFY2(NULL != cfg[3], "MFXCreateConfig failed");
     cfgVal.Type     = MFX_VARIANT_TYPE_U32;
+    cfgVal.Data.U32 = MFX_ACCEL_MODE_VIA_D3D11;
+    sts             = MFXSetConfigFilterProperty(cfg[3], (mfxU8 *)"mfxImplDescription.AccelerationMode", cfgVal);
+    VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for AccelerationMode");
+
+    cfg[4] = MFXCreateConfig(m_loader);
+    VERIFY2(NULL != cfg[4], "MFXCreateConfig failed");
+    cfgVal.Type     = MFX_VARIANT_TYPE_U32;
     cfgVal.Data.U32 = VPLVERSION(MAJOR_API_VERSION_REQUIRED, MINOR_API_VERSION_REQUIRED);
-    sts             = MFXSetConfigFilterProperty(cfg[3], (mfxU8 *)"mfxImplDescription.ApiVersion.Version", cfgVal);
+    sts             = MFXSetConfigFilterProperty(cfg[4], (mfxU8 *)"mfxImplDescription.ApiVersion.Version", cfgVal);
     VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for API version");
-
-    // Add filters for required surface sharing capabilities
-    for (auto surfaceCaps : *surfaceCapsList) {
-        mfxConfig cfgSS = MFXCreateConfig(m_loader);
-        VERIFY2(NULL != cfgSS, "MFXCreateConfig failed");
-
-        cfgVal.Type     = MFX_VARIANT_TYPE_U32;
-        cfgVal.Data.U32 = surfaceCaps.SurfaceType;
-        sts             = MFXSetConfigFilterProperty(cfgSS, (mfxU8 *)"mfxSurfaceTypesSupported.surftype.SurfaceType", cfgVal);
-        VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for SurfaceType");
-
-        cfgVal.Type     = MFX_VARIANT_TYPE_U32;
-        cfgVal.Data.U32 = surfaceCaps.SurfaceComponent;
-        sts             = MFXSetConfigFilterProperty(cfgSS, (mfxU8 *)"mfxSurfaceTypesSupported.surftype.surfcomp.SurfaceComponent", cfgVal);
-        VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for SurfaceType");
-
-        cfgVal.Type     = MFX_VARIANT_TYPE_U32;
-        cfgVal.Data.U32 = surfaceCaps.SurfaceFlags;
-        sts             = MFXSetConfigFilterProperty(cfgSS, (mfxU8 *)"mfxSurfaceTypesSupported.surftype.surfcomp.SurfaceFlags", cfgVal);
-        VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for SurfaceType");
-    }
-
-    mfxHDL idesc_path;
-    sts = MFXEnumImplementations(m_loader, 0, MFX_IMPLCAPS_IMPLPATH, &idesc_path);
-    VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXEnumImplementations failed for implpath");
 
     sts = MFXCreateSession(m_loader, 0, &m_session);
     VERIFY2(MFX_ERR_NONE == sts, "ERROR: cannot create session -- no implementations meet selection criteria");
-
-    printf("Created session with library: %s\n", (char *)idesc_path);
 
     return MFX_ERR_NONE;
 }
